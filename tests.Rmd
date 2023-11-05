@@ -1,0 +1,84 @@
+
+
+
+
+```{r load, echo=FALSE}
+library(dplyr)
+
+b_old = rio::import("./BLOOMy_DATA_2023-10-27_0932.csv")
+b_old = b_old%>% dplyr::select(record_id, redcap_event_name, res_perm_id)
+
+b_final = rio::import("./bloomy_data.csv") 
+final = b_final%>% dplyr::select(record_id, redcap_event_name, res_perm_id, visits_date, nida, scan_nida) %>%
+  dplyr::filter(is.na(visits_date))
+
+non_empty = b_final%>% dplyr::select(record_id, redcap_event_name, res_perm_id, visits_date, nida,scan_nida) 
+
+servolab = rio::import('E:/Final_Projects/ServoLab/Scripts/BLOOMY.xlsx')
+sl = servolab %>% dplyr::select(AuftrNr, EinDat, MethNr, AZ, ResTyp,  MessDatum, GebDatum, StatKrz, AbnahmeDatum) 
+
+x = merge(sl, final, by.x = "AuftrNr", by.y = "nida")
+x = x[!duplicated(x$AuftrNr),]
+x = x %>% dplyr::select(AuftrNr, AZ, AbnahmeDatum, record_id, redcap_event_name) %>% dplyr::filter(grepl("recrut", redcap_event_name))
+
+dat = merge(non_empty, x, by = c("record_id", "redcap_event_name"), all.x = TRUE)
+dat = dat %>% dplyr::group_by(record_id) %>% dplyr::arrange(visits_date, .by_group = TRUE) %>% dplyr::filter(grepl("recrut", redcap_event_name) & is.na(visits_date)) 
+dat = dat %>% dplyr::filter(!is.na(AbnahmeDatum))
+
+dat = dat %>% dplyr::filter(is.na(visits_date))
+
+
+dat$visits_date = substr(dat$AbnahmeDatum,1,10)
+dat = dat %>% dplyr::select(record_id, redcap_event_name, visits_date) %>% dplyr::filter(!is.na(visits_date))
+rio::export(dat, "dates3.csv")
+
+
+b_old = rio::import("./BLOOMy_DATA_2023-10-27_0932.csv")
+b_old = b_old%>% dplyr::select(record_id, redcap_event_name, res_perm_id)
+b_old = subset(b_old, b_old$record_id%in%b_final$record_id)
+
+
+m = dplyr::full_join(b_old, b_final, by = c("record_id", "redcap_event_name"))  
+  
+
+y = data_load[data_load$duration > 30,]
+z = subset(data_raw, data_raw$record_id%in%y$record_id)
+z = z %>% dplyr::select(record_id, redcap_event_name, res_perm_id, visits_date, visit_done, visit_notdone_reason, visit_notdone_oth_reas)
+
+
+day21 = b_final %>% 
+  dplyr::select(record_id, redcap_event_name,	scan_nida,	nida, visits_date)%>%
+  dplyr::filter(grepl("recrut", redcap_event_name))
+
+rio::export(day21, "day21_01112023.xlsx")
+
+
+
+s = c("Bloomy-289","Bloomy-299","Bloomy-339","Bloomy-340")
+s = c(toupper(s))
+ls = subset(sl, sl$AZ%in%s)
+ls = ls %>% group_by(AZ) %>% dplyr::arrange(AbnahmeDatum,.by_group = TRUE) %>% dplyr::slice(1)
+rio::export(ls, "1st_samples.xlsx")
+
+y = subset(b_final, b_final$record_id%in%s)
+y = y %>% dplyr::select(record_id, redcap_event_name, res_perm_id, visits_date, nida,scan_nida) %>% dplyr::filter(grepl("recrut", redcap_event_name))
+
+```
+
+
+```{r da, echo=FALSE}
+
+library(DT)
+cal = rio::import("./calenda.xlsx")
+week_begin = as.Date(format(as.Date(Sys.Date(), "%m/%d/%Y"),"%Y-%W-1"),"%Y-%W-%u")
+week_end = week_begin + 6
+week_begin
+week_end
+
+datatable(cal) %>% 
+  #formatStyle('visit_1', fontWeight = styleInterval(5, c('normal', 'bold'))) %>%
+  formatStyle('visit_1',color = styleInterval(c(as.Date(week_begin), as.Date(week_end)), c('brown', 'blue', 'red'))
+    #backgroundColor = styleInterval(week_begin, c('gray', 'yellow'))
+  ) 
+
+```
